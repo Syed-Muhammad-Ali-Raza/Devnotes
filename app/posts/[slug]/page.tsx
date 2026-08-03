@@ -2,6 +2,8 @@ import { createServerSupabase } from '@/lib/supabaseServer'
 import { notFound } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
 import Link from 'next/link'
+import LikeButton from '@/components/LikeButton'
+import CommentSection from '@/components/CommentSection'
 
 export const revalidate = 60
 
@@ -15,12 +17,31 @@ export default async function PostPage({
 
   const { data: post } = await supabase
     .from('posts')
-    .select('title, content_md, published_at, cover_image, profiles(username, avatar_url)')
+    .select('id, title, content_md, published_at, cover_image, profiles(username, avatar_url), post_tags(tags(name, slug))')
     .eq('slug', slug)
     .eq('status', 'published')
     .single()
 
   if (!post) return notFound()
+
+  // Fetch reactions count
+  const { count: likesCount } = await supabase
+    .from('reactions')
+    .select('*', { count: 'exact', head: true })
+    .eq('post_id', post.id)
+
+  // Check if current user has liked the post
+  const { data: { user } } = await supabase.auth.getUser()
+  let userHasLiked = false
+  if (user) {
+    const { data: userLike } = await supabase
+      .from('reactions')
+      .select('user_id')
+      .eq('post_id', post.id)
+      .eq('user_id', user.id)
+      .maybeSingle()
+    userHasLiked = !!userLike
+  }
 
   const date = new Date(post.published_at).toLocaleDateString('en-US', {
     month: 'long',
@@ -47,7 +68,7 @@ export default async function PostPage({
         {post.title}
       </h1>
 
-      <div className="flex items-center gap-3 border-b border-zinc-100 pb-6 mb-8 text-zinc-500 text-sm">
+      <div className="flex items-center gap-3 text-zinc-500 text-sm mb-6">
         <Link href={`/@${profile?.username ?? ''}`} className="flex items-center gap-2 hover:text-zinc-900 transition-colors">
           {profile?.avatar_url ? (
             <img
@@ -71,6 +92,20 @@ export default async function PostPage({
           {readingTime} min read
         </span>
       </div>
+
+      {post.post_tags && post.post_tags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 border-b border-zinc-100 pb-6 mb-8">
+          {post.post_tags.map((pt: any) => pt.tags && (
+            <Link
+              key={pt.tags.slug}
+              href={`/tags/${pt.tags.slug}`}
+              className="text-xs font-semibold text-zinc-500 hover:text-zinc-950 bg-zinc-50 hover:bg-zinc-100 border border-zinc-150 px-3 py-1 rounded-full transition"
+            >
+              #{pt.tags.name}
+            </Link>
+          ))}
+        </div>
+      )}
 
       <article className="prose prose-zinc max-w-none prose-headings:font-bold prose-a:text-blue-600 hover:prose-a:underline">
         <ReactMarkdown
@@ -99,6 +134,18 @@ export default async function PostPage({
           {post.content_md}
         </ReactMarkdown>
       </article>
+
+      {/* Interactive area: Likes & Actions */}
+      <div className="mt-12 pt-6 border-t border-zinc-100 flex items-center justify-between">
+        <LikeButton
+          postId={post.id}
+          initialLikesCount={likesCount ?? 0}
+          initialUserHasLiked={userHasLiked}
+        />
+      </div>
+
+      {/* Discussion section */}
+      <CommentSection postId={post.id} />
     </main>
   )
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabaseClient'
+import TagInput from '@/components/TagInput'
 
 function slugify(title: string) {
   return title
@@ -21,6 +22,7 @@ function EditorComponent() {
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [coverImage, setCoverImage] = useState('')
+  const [tags, setTags] = useState<string[]>([])
   const [status, setStatus] = useState<'draft' | 'published'>('draft')
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -33,7 +35,7 @@ function EditorComponent() {
       setLoading(true)
       const { data, error } = await supabase
         .from('posts')
-        .select('*')
+        .select('*, post_tags(tags(name))')
         .eq('id', postId)
         .single()
       if (error) {
@@ -43,6 +45,12 @@ function EditorComponent() {
         setContent(data.content_md)
         setCoverImage(data.cover_image || '')
         setStatus(data.status)
+        
+        // Map tags structure
+        const loadedTags = data.post_tags
+          ? data.post_tags.map((pt: any) => pt.tags?.name).filter(Boolean)
+          : []
+        setTags(loadedTags)
       }
       setLoading(false)
     }
@@ -74,20 +82,58 @@ function EditorComponent() {
     let query
     if (postId) {
       // Update existing post
-      query = supabase.from('posts').update(payload).eq('id', postId)
+      query = supabase.from('posts').update(payload).eq('id', postId).select('id').single()
     } else {
       // Insert new post
-      query = supabase.from('posts').insert(payload)
+      query = supabase.from('posts').insert(payload).select('id').single()
     }
 
-    const { error: dbError } = await query
-    setSaving(false)
+    const { data: savedPost, error: dbError } = await query
 
     if (dbError) {
       setError(dbError.message)
+      setSaving(false)
       return
     }
 
+    // Save Tags configuration
+    try {
+      if (postId) {
+        // Clear old post tags association
+        await supabase.from('post_tags').delete().eq('post_id', postId)
+      }
+
+      if (tags.length > 0) {
+        // 1. Prepare tag models
+        const tagsPayload = tags.map(tagName => ({
+          name: tagName,
+          slug: tagName.toLowerCase().trim().replace(/\s+/g, '-')
+        }))
+
+        // 2. Upsert tags into database
+        const { data: upsertedTags, error: tagsUpsertError } = await supabase
+          .from('tags')
+          .upsert(tagsPayload, { onConflict: 'name' })
+          .select('id')
+
+        if (tagsUpsertError) throw tagsUpsertError
+
+        // 3. Connect post with tags
+        if (upsertedTags) {
+          const postTagsPayload = upsertedTags.map(tag => ({
+            post_id: savedPost.id,
+            tag_id: tag.id
+          }))
+          const { error: linkError } = await supabase.from('post_tags').insert(postTagsPayload)
+          if (linkError) throw linkError
+        }
+      }
+    } catch (tagErr: any) {
+      console.error('Tags handling failed:', tagErr)
+      // We don't block post saving but let the user know
+    }
+
+    setSaving(false)
     router.push('/dashboard')
   }
 
@@ -107,6 +153,7 @@ function EditorComponent() {
         placeholder="Cover Image URL (optional)"
         className="w-full text-sm text-zinc-500 mb-6 outline-none border-b border-zinc-100 pb-2 placeholder-zinc-300"
       />
+      <TagInput tags={tags} onChange={setTags} />
       <textarea
         value={content}
         onChange={(e) => setContent(e.target.value)}

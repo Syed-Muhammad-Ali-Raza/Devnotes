@@ -42,7 +42,10 @@ export default function Navbar() {
               <Link href="/dashboard" className="text-sm font-medium text-zinc-600 hover:text-zinc-900">
                 Dashboard
               </Link>
-              <Link href="/write" className="bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-neutral-800">
+              <Link href="/settings" className="text-sm font-medium text-zinc-600 hover:text-zinc-900">
+                Settings
+              </Link>
+              <Link href="/write" className="bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-neutral-850 transition">
                 Write
               </Link>
               <button onClick={handleLogout} className="text-sm font-medium text-zinc-500 hover:text-red-600">
