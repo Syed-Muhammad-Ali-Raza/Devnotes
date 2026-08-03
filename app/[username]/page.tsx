@@ -32,7 +32,7 @@ export default async function ProfilePage({
   // Fetch posts by this author
   const { data: posts } = await supabase
     .from('posts')
-    .select('slug, title, content_md, published_at, profiles(username, avatar_url)')
+    .select('slug, title, content_md, published_at, profiles(username, avatar_url), post_tags(tags(name, slug))')
     .eq('author_id', profile.id)
     .eq('status', 'published')
     .order('published_at', { ascending: false })

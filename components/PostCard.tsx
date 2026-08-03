@@ -6,6 +6,7 @@ type Post = {
   content_md: string
   published_at: string
   profiles: { username: string; avatar_url: string | null } | null
+  post_tags?: { tags: { name: string; slug: string } | null }[] | null
 }
 
 export default function PostCard({ post }: { post: Post }) {
@@ -52,8 +53,22 @@ export default function PostCard({ post }: { post: Post }) {
         <h2 className="text-xl font-bold text-zinc-900 group-hover:text-black transition-colors mb-2 leading-snug">
           {post.title}
         </h2>
-        <p className="text-zinc-600 text-sm leading-relaxed">{excerpt}...</p>
+        <p className="text-zinc-600 text-sm leading-relaxed mb-4">{excerpt}...</p>
       </Link>
+
+      {post.post_tags && post.post_tags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {post.post_tags.map((pt: any) => pt.tags && (
+            <Link
+              key={pt.tags.slug}
+              href={`/tags/${pt.tags.slug}`}
+              className="text-[11px] font-semibold text-zinc-500 hover:text-zinc-900 bg-zinc-50 hover:bg-zinc-100 border border-zinc-150 rounded-md px-2 py-0.5 transition"
+            >
+              #{pt.tags.name}
+            </Link>
+          ))}
+        </div>
+      )}
     </article>
   )
 }

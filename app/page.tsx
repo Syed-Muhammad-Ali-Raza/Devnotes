@@ -10,7 +10,7 @@ export default async function HomePage() {
 
   const { data: posts } = await supabase
     .from('posts')
-    .select('slug, title, content_md, published_at, profiles(username, avatar_url)')
+    .select('slug, title, content_md, published_at, profiles(username, avatar_url), post_tags(tags(name, slug))')
     .eq('status', 'published')
     .order('published_at', { ascending: false })
 
