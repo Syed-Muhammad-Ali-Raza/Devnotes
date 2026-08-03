@@ -3,8 +3,30 @@ import PostCard from '@/components/PostCard'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Tag } from 'lucide-react'
+import type { Metadata } from 'next'
 
 export const revalidate = 60
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}): Promise<Metadata> {
+  const { slug } = await params
+  const supabase = await createServerSupabase()
+  const { data: tag } = await supabase
+    .from('tags')
+    .select('name')
+    .eq('slug', slug)
+    .maybeSingle()
+
+  if (!tag) return { title: 'Tag Not Found | Devnotes' }
+
+  return {
+    title: `Stories on #${tag.name} | Devnotes`,
+    description: `Read technical blog articles and developer guides discussing #${tag.name} on Devnotes.`,
+  }
+}
 
 export default async function TagPage({
   params,

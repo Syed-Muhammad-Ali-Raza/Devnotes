@@ -22,9 +22,10 @@ interface Comment {
 
 interface CommentSectionProps {
   postId: string
+  postSlug: string
 }
 
-export default function CommentSection({ postId }: CommentSectionProps) {
+export default function CommentSection({ postId, postSlug }: CommentSectionProps) {
   const supabase = createClient()
 
   const [comments, setComments] = useState<Comment[]>([])
@@ -63,6 +64,20 @@ export default function CommentSection({ postId }: CommentSectionProps) {
       console.error('Failed to load comments:', error.message)
     } else if (data) {
       setComments(data as Comment[])
+    }
+  }
+
+  async function triggerRevalidation() {
+    try {
+      await fetch('/api/revalidate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paths: [`/posts/${postSlug}`],
+        }),
+      })
+    } catch (e) {
+      console.error('Revalidation failed:', e)
     }
   }
 
@@ -106,6 +121,7 @@ export default function CommentSection({ postId }: CommentSectionProps) {
       }
       // Re-fetch comments to ensure the profile triggers are resolved correctly
       await fetchComments()
+      await triggerRevalidation()
     }
   }
 
@@ -123,6 +139,8 @@ export default function CommentSection({ postId }: CommentSectionProps) {
     if (error) {
       console.error('Failed to delete comment:', error.message)
       setComments(previousComments) // rollback
+    } else {
+      await triggerRevalidation()
     }
   }
 

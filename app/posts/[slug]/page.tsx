@@ -4,8 +4,48 @@ import ReactMarkdown from 'react-markdown'
 import Link from 'next/link'
 import LikeButton from '@/components/LikeButton'
 import CommentSection from '@/components/CommentSection'
+import TextToSpeech from '@/components/TextToSpeech'
+import type { Metadata } from 'next'
 
 export const revalidate = 60
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}): Promise<Metadata> {
+  const { slug } = await params
+  const supabase = await createServerSupabase()
+  const { data: post } = await supabase
+    .from('posts')
+    .select('title, content_md, cover_image')
+    .eq('slug', slug)
+    .eq('status', 'published')
+    .maybeSingle()
+
+  if (!post) return { title: 'Post Not Found | Devnotes' }
+
+  const cleanDescription = post.content_md
+    .replace(/[#*`_\[\]]/g, '')
+    .slice(0, 160) + '...'
+
+  return {
+    title: `${post.title} | Devnotes`,
+    description: cleanDescription,
+    openGraph: {
+      title: post.title,
+      description: cleanDescription,
+      images: post.cover_image ? [{ url: post.cover_image }] : [],
+      type: 'article',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: post.title,
+      description: cleanDescription,
+      images: post.cover_image ? [post.cover_image] : [],
+    },
+  }
+}
 
 export default async function PostPage({
   params,
@@ -17,7 +57,7 @@ export default async function PostPage({
 
   const { data: post } = await supabase
     .from('posts')
-    .select('id, title, content_md, published_at, cover_image, profiles(username, avatar_url), post_tags(tags(name, slug))')
+    .select('id, slug, title, content_md, published_at, cover_image, profiles(username, avatar_url), post_tags(tags(name, slug))')
     .eq('slug', slug)
     .eq('status', 'published')
     .single()
@@ -107,6 +147,8 @@ export default async function PostPage({
         </div>
       )}
 
+      <TextToSpeech contentMarkdown={post.content_md} title={post.title} />
+
       <article className="prose prose-zinc max-w-none prose-headings:font-bold prose-a:text-blue-600 hover:prose-a:underline">
         <ReactMarkdown
           components={{
@@ -145,7 +187,7 @@ export default async function PostPage({
       </div>
 
       {/* Discussion section */}
-      <CommentSection postId={post.id} />
+      <CommentSection postId={post.id} postSlug={post.slug} />
     </main>
   )
 }

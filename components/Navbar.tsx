@@ -9,6 +9,7 @@ export default function Navbar() {
   const supabase = createClient()
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
+  const [searchVal, setSearchVal] = useState('')
 
   useEffect(() => {
     async function getUser() {
@@ -30,12 +31,29 @@ export default function Navbar() {
     router.refresh()
   }
 
+  function handleSearchSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (searchVal.trim()) {
+      router.push(`/search?q=${encodeURIComponent(searchVal.trim())}`)
+    }
+  }
+
   return (
     <header className="border-b border-zinc-100 bg-white/80 backdrop-blur-md sticky top-0 z-50">
       <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
         <Link href="/" className="text-xl font-bold tracking-tight text-zinc-900">
           Devnotes
         </Link>
+        <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-xs mx-4">
+          <input
+            type="search"
+            value={searchVal}
+            onChange={(e) => setSearchVal(e.target.value)}
+            placeholder="Search stories..."
+            className="w-full bg-zinc-50 border border-zinc-200 rounded-full px-4 py-1.5 text-xs outline-none focus:ring-1 focus:ring-zinc-950 focus:border-zinc-950 transition"
+            aria-label="Search stories"
+          />
+        </form>
         <nav className="flex items-center gap-4">
           {user ? (
             <>

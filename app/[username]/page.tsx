@@ -1,6 +1,32 @@
 import { createServerSupabase } from '@/lib/supabaseServer'
 import { notFound } from 'next/navigation'
 import PostCard from '@/components/PostCard'
+import type { Metadata } from 'next'
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ username: string }>
+}): Promise<Metadata> {
+  const { username: rawUsername } = await params
+  const decoded = decodeURIComponent(rawUsername)
+  if (!decoded.startsWith('@')) return { title: 'Profile Not Found | Devnotes' }
+  const username = decoded.slice(1)
+
+  const supabase = await createServerSupabase()
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('username, bio')
+    .eq('username', username)
+    .maybeSingle()
+
+  if (!profile) return { title: 'Profile Not Found | Devnotes' }
+
+  return {
+    title: `@${profile.username} | Devnotes`,
+    description: profile.bio || `Developer profile of @${profile.username} on Devnotes.`,
+  }
+}
 
 export default async function ProfilePage({
   params,

@@ -129,3 +129,39 @@ create or replace trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
 
+-- Full-Text search indexer RPC function with ranking
+create or replace function public.search_posts(search_query text)
+returns table (
+  id uuid,
+  title text,
+  slug text,
+  content_md text,
+  published_at timestamp with time zone,
+  cover_image text,
+  author_username text,
+  author_avatar_url text
+) as $$
+begin
+  return query
+  select 
+    p.id,
+    p.title,
+    p.slug,
+    p.content_md,
+    p.published_at,
+    p.cover_image,
+    pr.username as author_username,
+    pr.avatar_url as author_avatar_url
+  from public.posts p
+  join public.profiles pr on p.author_id = pr.id
+  where p.status = 'published'
+    and (
+      to_tsvector('english', p.title || ' ' || p.content_md) @@ websearch_to_tsquery('english', search_query)
+      or p.title ilike '%' || search_query || '%'
+      or pr.username ilike '%' || search_query || '%'
+    )
+  order by ts_rank(to_tsvector('english', p.title || ' ' || p.content_md), websearch_to_tsquery('english', search_query)) desc, p.published_at desc;
+end;
+$$ language plpgsql security definer;
+
+
