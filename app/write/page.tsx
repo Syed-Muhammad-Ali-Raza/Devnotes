@@ -133,6 +133,23 @@ function EditorComponent() {
       // We don't block post saving but let the user know
     }
 
+    // Revalidate modified cache paths
+    try {
+      const pathsToRevalidate = ['/', '/dashboard', `/posts/${slug}`]
+      if (user.user_metadata?.user_name) {
+        pathsToRevalidate.push(`/@${user.user_metadata.user_name}`)
+      }
+      await fetch('/api/revalidate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paths: pathsToRevalidate,
+        }),
+      })
+    } catch (revalErr) {
+      console.error('Revalidation failed:', revalErr)
+    }
+
     setSaving(false)
     router.push('/dashboard')
   }
