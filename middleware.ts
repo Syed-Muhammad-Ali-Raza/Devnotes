@@ -33,9 +33,8 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Protect dashboard and write pages
-  const isProtectedPath = ['/write', '/dashboard'].some(path => 
-    request.nextUrl.pathname.startsWith(path)
+  const isProtectedPath = ['/write', '/dashboard', '/settings', '/bookmarks', '/notifications'].some(
+    (path) => request.nextUrl.pathname.startsWith(path)
   )
 
   if (isProtectedPath && !user) {

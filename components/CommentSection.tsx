@@ -42,15 +42,34 @@ export default function CommentSection({ postId, postSlug }: CommentSectionProps
 
   useEffect(() => {
     async function loadData() {
-      // Get current user session
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
-
-      // Fetch comments list
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser()
+      setUser(currentUser)
       await fetchComments()
       setLoading(false)
     }
-    loadData()
+    void loadData()
+
+    const channel = supabase
+      .channel(`comments:${postId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'comments',
+          filter: `post_id=eq.${postId}`,
+        },
+        () => {
+          void fetchComments()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
   }, [postId])
 
   async function fetchComments() {
