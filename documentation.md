@@ -2,6 +2,11 @@
 
 Welcome to the official system architecture and specification documentation for the **Devnotes** blog site. This document details the application's infrastructure layout, component interactions, database entities, security policies, and user flows.
 
+Related docs:
+
+- [PLANNING.md](./PLANNING.md) — phase roadmap and schema change rules
+- [CONTRIBUTING.md](./CONTRIBUTING.md) — unique local desk-check and PR path
+
 ---
 
 ## 1. System Architecture
@@ -30,15 +35,16 @@ graph TD
     GitHubAuth -->|3. Callback with Session Tokens| NextServer
     NextServer -->|4. Syncs Cookie Store / Session| Supabase
     Client -->|5. Fetches Posts & Profiles| Supabase
-    Client -->|6. Performs Likes, Comments, Tag Queries| Supabase
-    Supabase -->|7. Evaluates Rules| RLS
-    RLS -->|8. Reads & Writes Data| PG
+    Client -->|6. Performs Likes, Comments, Follows, Bookmarks| Supabase
+    Client -->|7. Subscribes to Realtime Comments & Notifications| Supabase
+    Supabase -->|8. Evaluates Rules| RLS
+    RLS -->|9. Reads & Writes Data| PG
 ```
 
 ### Server vs. Client Boundaries
 - **Server Components**: Used for static/dynamic page generation (e.g., Homepage Feed, Single Post page, Tag archive views). They query Supabase directly on the server to optimize loading times, render content, and reduce client-side Javascript.
-- **Client Components**: Used where interactivity is key (e.g., the write editor page, the like toggle button, settings profile fields, and comment submission forms).
-- **Session Middleware**: Intercepts `/dashboard`, `/write`, and `/settings` to verify authentication status and redirect unauthorized requests to `/login`.
+- **Client Components**: Used where interactivity is key (e.g., the write editor page, the like toggle button, follow/bookmark controls, notification bell, settings profile fields, and comment submission forms).
+- **Session Middleware**: Intercepts `/dashboard`, `/write`, `/settings`, `/bookmarks`, and `/notifications` to verify authentication status and redirect unauthorized requests to `/login`.
 
 ---
 
@@ -56,6 +62,10 @@ blog-app/
 │   │   └── page.tsx             # GitHub Authentication portal
 │   ├── dashboard/
 │   │   └── page.tsx             # Author dashboard for editing drafts or new posts
+│   ├── bookmarks/
+│   │   └── page.tsx             # Private reading list
+│   ├── notifications/
+│   │   └── page.tsx             # In-app notification inbox
 │   ├── posts/
 │   │   └── [slug]/
 │   │       └── page.tsx         # Article details page with Likes & Comments section
@@ -74,6 +84,9 @@ blog-app/
 │   ├── PostCard.tsx             # Card element displaying post meta, reading time, and tags
 │   ├── CommentSection.tsx       # Live threaded discussion element
 │   ├── LikeButton.tsx           # Optimistic reactions toggle button
+│   ├── BookmarkButton.tsx       # Reading list toggle
+│   ├── FollowButton.tsx         # Author follow control
+│   ├── NotificationBell.tsx     # Realtime notification dropdown
 │   └── TagInput.tsx             # Comma/Enter separated tagging control
 ├── lib/
 │   ├── supabaseClient.ts        # Client-side Supabase client instance builder
@@ -105,6 +118,7 @@ All records are stored in PostgreSQL on Supabase. RLS policies control table ope
 | | `cover_image`| `text` | Nullable | URL pointing to cover graphic. |
 | | `status` | `text` | Check ('draft', 'published')| Lifecycle status. |
 | | `published_at`| `timestamptz`| Nullable | Date post was changed from Draft to Published. |
+| | `view_count` | `integer` | Default `0` | Public view counter incremented via RPC. |
 | | `created_at`| `timestamptz`| Default `now()` | Creation date. |
 | **tags** | `id` | `uuid` | Primary Key | Internal identifier. |
 | | `name` | `text` | Unique, Not Null | Text name (e.g., 'nextjs'). |
@@ -120,6 +134,15 @@ All records are stored in PostgreSQL on Supabase. RLS policies control table ope
 | **reactions** | `post_id` | `uuid` | Primary Key, FK -> posts.id | Linked article post. |
 | | `user_id` | `uuid` | Primary Key, FK -> profiles.id | Author liking the post. |
 | | `type` | `text` | Default 'like' | Type of reaction registered. |
+| **follows** | `follower_id` | `uuid` | PK, FK -> profiles.id | User who follows. |
+| | `following_id` | `uuid` | PK, FK -> profiles.id | User being followed. |
+| **bookmarks** | `user_id` | `uuid` | PK, FK -> profiles.id | Owner of the reading list item. |
+| | `post_id` | `uuid` | PK, FK -> posts.id | Saved story. |
+| **notifications** | `id` | `uuid` | Primary Key | Notification identifier. |
+| | `user_id` | `uuid` | FK -> profiles.id | Recipient. |
+| | `actor_id` | `uuid` | FK -> profiles.id | User who triggered the event. |
+| | `type` | `text` | like / comment / reply / follow | Event category. |
+| | `read` | `boolean` | Default false | Inbox read state. |
 
 ### Row Level Security (RLS) Policies
 - **`posts`**:
@@ -135,6 +158,13 @@ All records are stored in PostgreSQL on Supabase. RLS policies control table ope
 - **`reactions`**:
   - `SELECT`: Publicly readable.
   - `INSERT` / `DELETE`: Restricted to the authenticated user matching `user_id`.
+- **`follows`**:
+  - `SELECT`: Publicly readable.
+  - `INSERT` / `DELETE`: Restricted to the authenticated follower.
+- **`bookmarks`**:
+  - `SELECT` / `INSERT` / `DELETE`: Restricted to the authenticated bookmark owner.
+- **`notifications`**:
+  - `SELECT` / `UPDATE` / `DELETE`: Restricted to the recipient. Inserts are created by security-definer triggers.
 
 ---
 
@@ -163,6 +193,13 @@ All records are stored in PostgreSQL on Supabase. RLS policies control table ope
 1. Navigating to `/settings` opens user info fields.
 2. Saving validates the username handle (removing spaces and invalid characters).
 3. On successful updates, changes update profiles and propagate across all post card elements.
+
+### Follow, Bookmark & Notification Flow
+1. Readers can follow an author from `/@username`. The homepage **Following** tab then shows only stories from followed writers.
+2. The **Save** control on an article writes a private `bookmarks` row and surfaces the story on `/bookmarks`.
+3. Likes, comments, replies, and follows insert `notifications` rows through database triggers.
+4. The navbar bell subscribes to Realtime inserts and deep-links into the related story or profile. Opening `/notifications` marks unread items as read.
+5. Article views call `increment_post_views(post_id)` once per browser session.
 
 ---
 

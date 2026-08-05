@@ -12,7 +12,15 @@ export default async function SearchPage({
   const query = q.trim()
 
   const supabase = await createServerSupabase()
-  let posts: any[] = []
+  let posts: {
+    slug: string
+    title: string
+    content_md: string
+    published_at: string
+    view_count?: number
+    profiles: { username: string; avatar_url: string | null }
+    post_tags: []
+  }[] = []
   let error = ''
 
   if (query) {
@@ -26,16 +34,25 @@ export default async function SearchPage({
       console.error(searchError)
     } else {
       // Map return columns from RPC to match PostCard requirements
-      posts = (data || []).map((p: any) => ({
+      posts = (data || []).map((p: {
+        slug: string
+        title: string
+        content_md: string
+        published_at: string
+        view_count?: number
+        author_username: string
+        author_avatar_url: string | null
+      }) => ({
         slug: p.slug,
         title: p.title,
         content_md: p.content_md,
         published_at: p.published_at,
+        view_count: p.view_count ?? 0,
         profiles: {
           username: p.author_username,
           avatar_url: p.author_avatar_url,
         },
-        post_tags: [], // Tags mapping is optional for search lists
+        post_tags: [],
       }))
     }
   }
