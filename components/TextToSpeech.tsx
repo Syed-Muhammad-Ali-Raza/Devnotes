@@ -101,7 +101,7 @@ export default function TextToSpeech({ contentMarkdown, title }: TextToSpeechPro
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold text-zinc-800">Listen to this article</p>
-        <p className="text-[10px] text-zinc-400 truncate">Powered by your browser's screen narration</p>
+        <p className="text-[10px] text-zinc-400 truncate">Powered by your browser&apos;s screen narration</p>
       </div>
       <div className="flex items-center gap-1.5">
         <button

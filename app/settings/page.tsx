@@ -3,8 +3,10 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabaseClient'
-import { User, Shield, Info, ArrowLeft, Loader2, Check } from 'lucide-react'
+import { Shield, ArrowLeft, Loader2, Check } from 'lucide-react'
 import Link from 'next/link'
+import ImagePicker from '@/components/ImageUploader'
+import { avatarPath, objectMime } from '@/lib/storage'
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -18,6 +20,7 @@ export default function SettingsPage() {
   const [username, setUsername] = useState('')
   const [bio, setBio] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
   
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
@@ -70,13 +73,32 @@ export default function SettingsPage() {
       return
     }
 
+    // Upload a newly-selected avatar before persisting, so we store the public URL.
+    let avatarToSave = avatarUrl.trim() || null
+    if (avatarFile) {
+      const path = avatarPath(userId, objectMime(avatarFile))
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, avatarFile, { upsert: true })
+
+      if (uploadError) {
+        setSaving(false)
+        setError(uploadError.message)
+        return
+      }
+
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path)
+      avatarToSave = urlData.publicUrl
+      setAvatarUrl(urlData.publicUrl)
+    }
+
     const { error: saveError } = await supabase
       .from('profiles')
       .upsert({
         id: userId,
         username: cleanedUsername,
         bio: bio.trim() || null,
-        avatar_url: avatarUrl.trim() || null,
+        avatar_url: avatarToSave,
       })
 
     setSaving(false)
@@ -93,7 +115,6 @@ export default function SettingsPage() {
       router.refresh()
     }
   }
-
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-zinc-500">
@@ -117,29 +138,21 @@ export default function SettingsPage() {
         </div>
 
         <form onSubmit={handleSave} className="space-y-6">
-          {/* Avatar Preview */}
-          <div className="flex items-center gap-4">
-            {avatarUrl ? (
-              <img
-                src={avatarUrl}
-                alt="Avatar preview"
-                className="w-16 h-16 rounded-full object-cover border border-zinc-200 shadow-sm"
-              />
-            ) : (
-              <div className="w-16 h-16 rounded-full bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-400 font-bold text-xl">
-                {username ? username[0]?.toUpperCase() : '?'}
-              </div>
-            )}
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500">Profile Photo</label>
-              <input
-                type="url"
-                value={avatarUrl}
-                onChange={(e) => setAvatarUrl(e.target.value)}
-                placeholder="https://example.com/avatar.jpg"
-                className="mt-1 block w-full sm:w-80 text-sm text-zinc-800 border-b border-zinc-200 outline-none focus:border-zinc-950 pb-1"
-              />
-            </div>
+          {/* Avatar */}
+          <div>
+            <ImagePicker
+              purpose="avatar"
+              persistedUrl={avatarUrl}
+              label="Profile Photo"
+              onFileSelected={(file) => setAvatarFile(file)}
+              onCleared={() => {
+                setAvatarUrl('')
+                setAvatarFile(null)
+              }}
+            />
+            <p className="text-xs text-zinc-400 mt-1.5">
+              Your current GitHub avatar is used automatically on first login. Uploading here replaces it.
+            </p>
           </div>
 
           {/* Username */}

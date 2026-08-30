@@ -1,0 +1,19 @@
+{
+  "model": "claude-sonnet-4-6",
+  "instructions": [
+    "Read AGENTS.md at the repo root before starting work; it is the source of truth for Devnotes conventions.",
+    "TypeScript stays strict. No new `any` unless a Supabase join forces a narrow `unknown` cast.",
+    "Prefer Server Components; add `'use client'` only for browser state.",
+    "Schema changes go in an append-only PHASE N block at the bottom of supabase-schema.sql. Never rewrite Phase 1-4 history.",
+    "Never commit .env.local, secrets, or Supabase keys.",
+    "RLS-safe: a second logged-in user must never see another author's drafts or private bookmarks.",
+    "Use createServerSupabase() (lib/supabaseServer.ts) for server data, createClient() (lib/supabaseClient.ts) for browser mutations.",
+    "After publish/delete/comment/like, call /api/revalidate for stale paths. Optimistic UI rolls back on Supabase errors.",
+    "Zinc/black/white palette only. Avoid non-standard Tailwind classes (border-zinc-150, bg-zinc-150, border-zinc-250, text-zinc-955, h-8.5, w-6.5).",
+    "Run `npx tsc --noEmit` and `npm run lint` before finishing a task."
+  ],
+  "permissions": {
+    "allow": ["Read", "Edit", "Glob", "Grep"],
+    "ask": ["Write", "Bash"]
+  }
+}

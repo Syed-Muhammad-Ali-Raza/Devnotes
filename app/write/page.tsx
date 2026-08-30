@@ -4,6 +4,8 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabaseClient'
 import TagInput from '@/components/TagInput'
+import ImageUploader from '@/components/ImageUploader'
+import { coverPath, objectMime } from '@/lib/storage'
 
 function slugify(title: string) {
   return title
@@ -22,6 +24,7 @@ function EditorComponent() {
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [coverImage, setCoverImage] = useState('')
+  const [coverFile, setCoverFile] = useState<File | null>(null)
   const [tags, setTags] = useState<string[]>([])
   const [status, setStatus] = useState<'draft' | 'published'>('draft')
   const [saving, setSaving] = useState(false)
@@ -69,6 +72,9 @@ function EditorComponent() {
     }
 
     const slug = slugify(title)
+    // For a brand-new post we don't know the id yet, so a freshly chosen cover
+    // cannot be uploaded until the row exists. Persist any existing URL, and
+    // upload the new local file right after insert/update below.
     const payload = {
       author_id: user.id,
       title,
@@ -94,6 +100,24 @@ function EditorComponent() {
       setError(dbError.message)
       setSaving(false)
       return
+    }
+
+    // Upload a newly-selected cover and point the post at its public URL.
+    if (coverFile && savedPost?.id) {
+      const path = coverPath(user.id, savedPost.id, objectMime(coverFile))
+      const { error: uploadError } = await supabase.storage
+        .from('covers')
+        .upload(path, coverFile, { upsert: true })
+
+      if (uploadError) {
+        console.error('Cover upload failed:', uploadError)
+        setError('Post saved, but the cover image could not be uploaded.')
+      } else {
+        const { data: urlData } = supabase.storage.from('covers').getPublicUrl(path)
+        const publicUrl = urlData.publicUrl
+        await supabase.from('posts').update({ cover_image: publicUrl }).eq('id', savedPost.id)
+        setCoverImage(publicUrl)
+      }
     }
 
     // Save Tags configuration
@@ -164,12 +188,18 @@ function EditorComponent() {
         placeholder="Post title"
         className="w-full text-3xl font-bold mb-6 outline-none placeholder-gray-300"
       />
-      <input
-        value={coverImage}
-        onChange={(e) => setCoverImage(e.target.value)}
-        placeholder="Cover Image URL (optional)"
-        className="w-full text-sm text-zinc-500 mb-6 outline-none border-b border-zinc-100 pb-2 placeholder-zinc-300"
-      />
+      <div className="mb-6">
+        <ImageUploader
+          purpose="cover"
+          persistedUrl={coverImage}
+          label="Cover Image (optional)"
+          onFileSelected={(file) => setCoverFile(file)}
+          onCleared={() => {
+            setCoverImage('')
+            setCoverFile(null)
+          }}
+        />
+      </div>
       <TagInput tags={tags} onChange={setTags} />
       <textarea
         value={content}
