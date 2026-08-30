@@ -111,11 +111,9 @@ export default function CommentSection({ postId, postSlug }: CommentSectionProps
     }
 
     setSubmitting(true)
-    
-    // In database schema: check (auth.uid() = author_id)
-    // Wait! Let's look closely at the policy:
-    // create policy "Logged-in users can comment" on public.comments for insert with check (auth.uid() = author_id);
-    // So we must supply author_id as user.id in the payload!
+
+    // RLS enforces auth.uid() = author_id on comments.insert, so the payload
+    // must carry the current user's id for the policy to pass.
     const { data: insertedData, error: insertError } = await supabase
       .from('comments')
       .insert({

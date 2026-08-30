@@ -5,7 +5,18 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/dashboard'
+  let next = searchParams.get('next') ?? '/dashboard'
+
+  // Open-redirect guard: only allow same-origin absolute paths. Reject anything
+  // with a scheme, protocol-relative `//`, backslashes, or that isn't a clean path.
+  if (
+    !next.startsWith('/') ||
+    next.startsWith('//') ||
+    next.startsWith('/\\') ||
+    /^[a-z][a-z0-9+.-]*:/i.test(next)
+  ) {
+    next = '/dashboard'
+  }
 
   if (code) {
     const cookieStore = await cookies()
