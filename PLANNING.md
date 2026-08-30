@@ -24,6 +24,7 @@ Every feature must pass three checks:
 | **2** | Engagement | Settings, tags, likes, nested comments, richer post cards |
 | **3** | Discovery & publishing | Search RPC, SEO metadata, sitemap, RSS, TTS reader, ISR revalidation |
 | **4** | Community graph | Follows, Following feed, bookmarks, notifications, view counts, related posts, live comments |
+| **5** | Media Desk | Supabase Storage covers/avatars, live cover preview on write, one-click avatar uploader |
 
 ---
 
@@ -38,22 +39,11 @@ flowchart LR
     P5 --> P6[Phase 6 Writer Craft]
     P6 --> P7[Phase 7 Series & Digest]
 ```
-
 ---
 
 ## Upcoming Phases
 
-### Phase 5 — Media Desk
-Turn URL-only images into first-class Supabase Storage uploads.
-
-Unique delivery steps:
-
-1. Create public buckets named `covers` and `avatars` only — no generic `uploads` bucket.
-2. Cover files must be stored as `{author_id}/{post_id}-cover.*`.
-3. Avatar files must be stored as `{user_id}/avatar.*` and overwrite in place.
-4. Reject anything outside `image/jpeg`, `image/png`, `image/webp`.
-5. The write page preview must show the uploaded cover before publish.
-6. Settings must replace the avatar URL field with a one-click uploader, while still accepting GitHub's default avatar on first login.
+> **Phase 5 — Media Desk** is delivered. Its unique delivery steps below are kept as the completion record.
 
 ### Phase 6 — Writer Craft
 Make the editor feel like a notebook, not a textarea.
@@ -126,3 +116,5 @@ Phase work lands on `dev` as small PRs, then merges to `production` when the pha
 | 2026-08 | Client-side likes/follows with optimistic UI | Instant feedback without server actions ceremony |
 | 2026-08 | Notifications via DB triggers | Events stay consistent even if the client fails mid-request |
 | 2026-08 | View counts via `increment_post_views` RPC | Anonymous readers can increment without gaining `UPDATE` on `posts` |
+| 2026-08 | Storage buckets `covers` + `avatars` only (public), no generic `uploads` | Matches the media desk scope and keeps cover/avatar paths predictable for RLS |
+| 2026-08 | Covers stored at `{author_id}/{post_id}-cover.*`; avatars at `{user_id}/avatar.*` overwrite in place | Deterministic paths make ownership checks and overwrite-on-reupload trivial |

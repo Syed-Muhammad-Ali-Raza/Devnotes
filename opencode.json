@@ -1,0 +1,46 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"],
+  "skills": {
+    "paths": [".opencode/skills"]
+  },
+  "agent": {
+    "backend-engineer": {
+      "description": "Full-stack Supabase backend specialist: DB schema, RLS policies, RPC functions, triggers, supabase-js queries, and server component data fetching.",
+      "mode": "all",
+      "model": "anthropic/claude-sonnet-4-6"
+    },
+    "frontend-engineer": {
+      "description": "Next.js App Router + Tailwind UI specialist: server/client components, optimistic mutations, routing, SEO metadata, and the zinc-quiet design system.",
+      "mode": "all",
+      "model": "anthropic/claude-sonnet-4-6"
+    },
+    "db-reviewer": {
+      "description": "Reviews schema and RLS changes for security, policy gaps, and phase-block conventions in supabase-schema.sql.",
+      "mode": "subagent",
+      "model": "anthropic/claude-sonnet-4-6",
+      "permission": {
+        "edit": "deny",
+        "bash": "ask"
+      }
+    }
+  },
+  "command": {
+    "lint": {
+      "description": "Run the Next.js linter.",
+      "template": "Run `npm run lint` and fix any errors or warnings it reports. Re-run until clean."
+    },
+    "typecheck": {
+      "description": "Run the TypeScript compiler in strict no-emit mode per the contributing desk check.",
+      "template": "Run `npx tsc --noEmit` from the repo root and fix every type error it reports. TypeScript must stay strict: no new `any` unless a Supabase join forces a narrow `unknown` cast. Re-run until clean."
+    },
+    "phase": {
+      "description": "Summarize the current active phase and what needs to be implemented next from PLANNING.md.",
+      "template": "Read PLANNING.md. Identify the current active phase and its unique delivery steps. Summarize what is done and what the next concrete implementation step should be, then propose how to proceed."
+    },
+    "deskcheck": {
+      "description": "Walk through the full contributor desk check: typecheck, routes tour, and schema stamp reminder.",
+      "template": "Run the Step 9 desk check from CONTRIBUTING.md: run `npx tsc --noEmit`, then audit the routes /, /write, /dashboard, /settings, /search, /notifications, /bookmarks. Report what passes and what fails, and remind about the Schema Stamp for any phase block touched."
+    }
+  }
+}

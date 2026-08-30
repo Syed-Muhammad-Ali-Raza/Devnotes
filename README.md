@@ -21,6 +21,7 @@ Devnotes is a modern, content-focused blog site built using the **Next.js App Ro
 - 🔔 **Notifications**: In-app alerts for likes, comments, replies, and new followers.
 - 📈 **View Counts**: Track story reach on cards, articles, and the dashboard.
 - ⚙️ **Profile Settings**: Custom username handles and bio configuration.
+- 🖼️ **Media Desk (Storage)**: Upload story covers and avatars to Supabase Storage with live preview and MIME-safe uploads.
 - 🔍 **Search, SEO & RSS**: Full-text search, sitemaps, Open Graph metadata, and an RSS feed.
 
 ---
@@ -61,10 +62,12 @@ blog-app/
 │   ├── BookmarkButton.tsx    # Reading list toggle
 │   ├── FollowButton.tsx      # Author follow/unfollow control
 │   ├── NotificationBell.tsx  # Realtime notification dropdown
+│   ├── ImageUploader.tsx     # Cover/avatar uploader with live preview (Phase 5)
 │   └── TagInput.tsx          # Tag creation controller inside the write page
 ├── lib/
 │   ├── supabaseClient.ts     # Client-side Supabase client
-│   └── supabaseServer.ts     # Server-side Supabase client
+│   ├── supabaseServer.ts     # Server-side Supabase client
+│   └── storage.ts            # Cover/avatar path + MIME helpers (Phase 5)
 ├── supabase-schema.sql       # Database DDL statements & security policies
 └── tailwind.config.ts        # Custom theme values (Slate/Zinc colors)
 ```
@@ -84,8 +87,8 @@ npm install
 ### 2. Database Provisioning
 1. Sign in to your [Supabase Dashboard](https://supabase.com) and create a new project.
 2. Navigate to the **SQL Editor** tab in Supabase.
-3. Paste the contents of [supabase-schema.sql](./supabase-schema.sql) and click **Run**. This constructs your tables (`profiles`, `posts`, `tags`, `post_tags`, `comments`, `reactions`, `follows`, `bookmarks`, `notifications`), indexes, triggers, RPC helpers, and Row Level Security (RLS) policies.
-4. If the project already exists from an earlier phase, run only the **PHASE 4** section at the bottom of `supabase-schema.sql`.
+3. Paste the contents of [supabase-schema.sql](./supabase-schema.sql) and click **Run**. This constructs your tables (`profiles`, `posts`, `tags`, `post_tags`, `comments`, `reactions`, `follows`, `bookmarks`, `notifications`), indexes, triggers, RPC helpers, and Row Level Security (RLS) policies, plus the `covers` and `avatars` Storage buckets and their RLS/guards.
+4. If the project already exists from an earlier phase, run only the **PHASE 5** section at the bottom of `supabase-schema.sql`.
 5. In **Database -> Replication**, confirm `comments` and `notifications` are enabled for Realtime (the schema attempts to add them automatically).
 
 ### 3. OAuth Provider Integration

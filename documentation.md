@@ -87,10 +87,12 @@ blog-app/
 │   ├── BookmarkButton.tsx       # Reading list toggle
 │   ├── FollowButton.tsx         # Author follow control
 │   ├── NotificationBell.tsx     # Realtime notification dropdown
-│   └── TagInput.tsx             # Comma/Enter separated tagging control
+│   ├── TagInput.tsx             # Comma/Enter separated tagging control
+│   └── ImageUploader.tsx        # Cover/avatar file picker with local preview (Phase 5)
 ├── lib/
 │   ├── supabaseClient.ts        # Client-side Supabase client instance builder
-│   └── supabaseServer.ts        # Server-side Supabase client instance builder
+│   ├── supabaseServer.ts        # Server-side Supabase client instance builder
+│   └── storage.ts               # Cover/avatar path + MIME helpers for Storage (Phase 5)
 ├── supabase-schema.sql          # Full database definition SQL
 └── tailwind.config.ts           # Design tokens configuration
 ```
@@ -166,6 +168,20 @@ All records are stored in PostgreSQL on Supabase. RLS policies control table ope
 - **`notifications`**:
   - `SELECT` / `UPDATE` / `DELETE`: Restricted to the recipient. Inserts are created by security-definer triggers.
 
+### Storage (Supabase Storage) — Phase 5 Media Desk
+
+Two **public** buckets exist: `covers` and `avatars`. There is no generic `uploads` bucket.
+
+| Bucket | Object path | Rule |
+|---|---|---|
+| `covers` | `{author_id}/{post_id}-cover.{jpg\|png\|webp}` | Cover art for a post. |
+| `avatars` | `{user_id}/avatar.{jpg\|png\|webp}` | Fixed path; re-upload overwrites in place. |
+
+- **SSE RLS** on `storage.objects`:
+  - Anyone may `SELECT` from either bucket.
+  - `INSERT` / `UPDATE` / `DELETE` are restricted to the authenticated user whose ID equals `path_tokens[1]` (the folder owner). UPDATE uses both `USING` and `WITH CHECK` to prevent path-poisoning by rename.
+- **Shape + MIME guards** (`check_cover_upload`, `check_avatar_upload` triggers) reject anything outside the path shape above and any MIME other than `image/jpeg`, `image/png`, `image/webp`.
+
 ---
 
 ## 4. Operational User Flows
@@ -173,7 +189,8 @@ All records are stored in PostgreSQL on Supabase. RLS policies control table ope
 ### Writing & Tagging Flow
 1. The user logs in via GitHub and navigates to `/write`.
 2. As they enter text, they type tag terms into the **Tags Input**. Commas and Enter convert inputs into tags (e.g. `javascript`).
-3. On save/publish:
+3. The user can optionally pick a **cover image** with the `ImageUploader`, which shows a local preview before publish. The file is uploaded to the `covers` bucket only after the post row exists, stored as `{author_id}/{post_id}-cover.{ext}`, and its public URL is written to `cover_image`.
+4. On save/publish:
    - The post is created/updated.
    - Tags are bulk upserted into the `tags` database table on-conflict of unique name.
    - The post's current connections inside `post_tags` are deleted, and the new set is batch inserted.
@@ -191,8 +208,9 @@ All records are stored in PostgreSQL on Supabase. RLS policies control table ope
 
 ### Settings Configuration Flow
 1. Navigating to `/settings` opens user info fields.
-2. Saving validates the username handle (removing spaces and invalid characters).
-3. On successful updates, changes update profiles and propagate across all post card elements.
+2. The profile photo field is a one-click `ImageUploader`: choosing a file uploads it to the `avatars` bucket at `{user_id}/avatar.{ext}` (overwriting in place) and stores the public URL. GitHub's default avatar is still accepted on first login.
+3. Saving validates the username handle (removing spaces and invalid characters).
+4. On successful updates, changes update profiles and propagate across all post card elements.
 
 ### Follow, Bookmark & Notification Flow
 1. Readers can follow an author from `/@username`. The homepage **Following** tab then shows only stories from followed writers.

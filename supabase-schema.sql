@@ -409,4 +409,136 @@ exception
   when duplicate_object then null;
 end $$;
 
+-- =============================================================================
+-- PHASE 5 — Media Desk: Supabase Storage covers & avatars
+-- Safe to run on existing databases
+-- =============================================================================
+
+-- Public buckets only: `covers` and `avatars`. No generic `uploads` bucket.
+insert into storage.buckets (id, name, public)
+values ('covers', 'covers', true),
+       ('avatars', 'avatars', true)
+on conflict (id) do nothing;
+
+-- Cover objects live at {author_id}/{post_id}-cover.{ext}
+create or replace function public.check_cover_upload()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- Enforce path shape {author_id}/{post_id}-cover.{ext} and mime allow-list
+  if new.bucket_id = 'covers' then
+    if new.path_tokens is null
+       or array_length(new.path_tokens, 1) <> 2
+       or not (new.path_tokens[2] ~ '^[0-9a-f-]+-cover\.(jpe?g|png|webp)$')
+       or lower(coalesce(new.mimetype, '')) not in ('image/jpeg', 'image/png', 'image/webp') then
+      raise exception 'Invalid cover upload. Use {author_id}/{post_id}-cover.{jpg|png|webp}';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+-- Avatar objects live at {user_id}/avatar.{ext} and overwrite in place
+create or replace function public.check_avatar_upload()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.bucket_id = 'avatars' then
+    if new.path_tokens is null
+       or array_length(new.path_tokens, 1) <> 2
+       or not (new.path_tokens[2] ~ '^avatar\.(jpe?g|png|webp)$')
+       or lower(coalesce(new.mimetype, '')) not in ('image/jpeg', 'image/png', 'image/webp') then
+      raise exception 'Invalid avatar upload. Use {user_id}/avatar.{jpg|png|webp}';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_cover_upload on storage.objects;
+create trigger on_cover_upload
+  before insert or update on storage.objects
+  for each row execute procedure public.check_cover_upload();
+
+drop trigger if exists on_avatar_upload on storage.objects;
+create trigger on_avatar_upload
+  before insert or update on storage.objects
+  for each row execute procedure public.check_avatar_upload();
+
+-- RLS on storage.objects for the two buckets.
+-- The public/anonymous role may only read; authenticated users write to paths
+-- whose first token is their own user id.
+
+drop policy if exists "ST covers are viewable" on storage.objects;
+create policy "ST covers are viewable"
+  on storage.objects for select
+  using (bucket_id = 'covers');
+
+drop policy if exists "ST users upload their own covers" on storage.objects;
+create policy "ST users upload their own covers"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'covers'
+    and auth.uid()::text = coalesce(new.path_tokens[1], '')
+  );
+
+drop policy if exists "ST users update their own covers" on storage.objects;
+create policy "ST users update their own covers"
+  on storage.objects for update
+  using (
+    bucket_id = 'covers'
+    and auth.uid()::text = coalesce((storage.foldername(name))[1], '')
+  )
+  with check (
+    bucket_id = 'covers'
+    and auth.uid()::text = coalesce(new.path_tokens[1], '')
+  );
+
+drop policy if exists "ST users delete their own covers" on storage.objects;
+create policy "ST users delete their own covers"
+  on storage.objects for delete
+  using (
+    bucket_id = 'covers'
+    and auth.uid()::text = coalesce((storage.foldername(name))[1], '')
+  );
+
+drop policy if exists "ST avatars are viewable" on storage.objects;
+create policy "ST avatars are viewable"
+  on storage.objects for select
+  using (bucket_id = 'avatars');
+
+drop policy if exists "ST users upload their own avatars" on storage.objects;
+create policy "ST users upload their own avatars"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'avatars'
+    and auth.uid()::text = coalesce(new.path_tokens[1], '')
+  );
+
+drop policy if exists "ST users update their own avatars" on storage.objects;
+create policy "ST users update their own avatars"
+  on storage.objects for update
+  using (
+    bucket_id = 'avatars'
+    and auth.uid()::text = coalesce((storage.foldername(name))[1], '')
+  )
+  with check (
+    bucket_id = 'avatars'
+    and auth.uid()::text = coalesce(new.path_tokens[1], '')
+  );
+
+drop policy if exists "ST users delete their own avatars" on storage.objects;
+create policy "ST users delete their own avatars"
+  on storage.objects for delete
+  using (
+    bucket_id = 'avatars'
+    and auth.uid()::text = coalesce((storage.foldername(name))[1], '')
+  );
+
 

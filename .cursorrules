@@ -1,0 +1,39 @@
+# Devnotes — Cursor / Claude Code / Antigravity agent rules
+
+This file gives Cursor Compose/Agent, Claude Code, and Antigravity the same conventions that opencode reads from AGENTS.md. Keep the two in sync.
+
+## Stack
+
+Next.js 14 App Router, React 18, TypeScript (strict), Tailwind 3.4, lucide-react, react-markdown.
+Supabase: Auth (GitHub OAuth), Postgres, RLS, Realtime, `@supabase/ssr`.
+
+## Ground rules (non-negotiable)
+
+1. TypeScript stays strict. No new `any` unless a Supabase join forces a narrow `unknown` cast.
+2. Zinc / black / white visual language only. Never introduce a second brand color.
+3. Prefer Server Components. Add `'use client'` only when the UI needs browser state.
+4. Schema changes go in an append-only `PHASE N` block at the bottom of `supabase-schema.sql`. Never rewrite Phase 1–4 history.
+5. Never commit `.env.local`, secrets, or Supabase keys.
+6. RLS-safe: a second logged-in user must never see another author's drafts or private bookmarks.
+
+## Data access
+
+- Server data fetching → `createServerSupabase()` from `lib/supabaseServer.ts`.
+- Browser mutations → `createClient()` from `lib/supabaseClient.ts`.
+- Protected routes must be added to `middleware.ts` (`/write`, `/dashboard`, `/settings`, `/bookmarks`, `/notifications`).
+- After publish / delete / comment / like, call `/api/revalidate` for stale paths.
+- Optimistic UI must roll back on Supabase errors (see `LikeButton`, `FollowButton`).
+- Shared shapes in `lib/types.ts`. Icons from `lucide-react`.
+
+## Styling
+
+Use stock Tailwind `zinc`/`black`/`white`/`gray`. Do NOT use non-standard classes like `border-zinc-150`, `bg-zinc-150`, `border-zinc-250`, `text-zinc-955`, `h-8.5`, `w-6.5` — replace with valid scale values or arbitrary `h-[34px]`.
+
+## Roadmap
+
+- Done: Phases 1–4. Next: Phase 5 Media Desk, Phase 6 Writer Craft, Phase 7 Series & Digest.
+- Follow `PLANNING.md`; the unique delivery steps are the contract per phase.
+
+## Verification
+
+Before finishing: `npx tsc --noEmit` then `npm run lint` from repo root.
